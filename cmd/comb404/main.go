@@ -55,8 +55,8 @@ func combine(base string) error {
 		return fmt.Errorf("find files for pads: %w", err)
 	}
 
-	for pad, infos := range files {
-		err := comb.CombineWavFiles(context.Background(), infos, "out/"+lastDir+"/"+pad+".wav")
+	for _, infos := range files {
+		err := comb.CombineWavFiles(context.Background(), infos, "out/"+lastDir+"/")
 		if err != nil {
 			return fmt.Errorf("combine wav files: %w", err)
 		}

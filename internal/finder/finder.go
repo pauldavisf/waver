@@ -13,6 +13,11 @@ import (
 	"golang.org/x/exp/slices"
 )
 
+type pad struct {
+	SampleName string
+	PadName    string
+}
+
 func FindFilesForPads(ctx context.Context, basePath string, pads []string) (map[string][]comb.CombInfo, error) {
 	result := make(map[string][]comb.CombInfo)
 	seen := make(map[string]struct{})
@@ -22,23 +27,23 @@ func FindFilesForPads(ctx context.Context, basePath string, pads []string) (map[
 		if err != nil {
 			return nil, fmt.Errorf("find not seen pad: %w", err)
 		}
-		if pad == "" {
+		if pad == nil {
 			break
 		}
 
-		infos, err := getInfosForPad(ctx, basePath, pads, pad)
+		infos, err := getInfosForPad(ctx, basePath, pads, *pad)
 		if err != nil {
 			return nil, fmt.Errorf("get files for pad %s: %w", pad, err)
 		}
 
-		result[pad] = infos
-		seen[pad] = struct{}{}
+		result[pad.PadName] = infos
+		seen[pad.PadName] = struct{}{}
 	}
 
 	return result, nil
 }
 
-func getInfosForPad(ctx context.Context, basePath string, pads []string, pad string) ([]comb.CombInfo, error) {
+func getInfosForPad(ctx context.Context, basePath string, pads []string, pad pad) ([]comb.CombInfo, error) {
 	entries, err := os.ReadDir(basePath)
 	if err != nil {
 		panic(err)
@@ -71,11 +76,12 @@ func getInfosForPad(ctx context.Context, basePath string, pads []string, pad str
 				if !f.IsDir() && strings.HasSuffix(strings.ToLower(f.Name()), wav.WavExt) {
 					randomFile = f
 
-					if strings.HasPrefix(f.Name(), pad) {
+					if strings.HasPrefix(f.Name(), pad.PadName) {
 						fullPath := filepath.Join(subdir, f.Name())
 						infos = append(infos, comb.CombInfo{
-							Filename: fullPath,
-							AddEmpty: false,
+							Filename:   fullPath,
+							SampleName: pad.SampleName,
+							AddEmpty:   false,
 						})
 
 						added = true
@@ -87,8 +93,9 @@ func getInfosForPad(ctx context.Context, basePath string, pads []string, pad str
 
 			if !added {
 				infos = append(infos, comb.CombInfo{
-					Filename: filepath.Join(subdir, randomFile.Name()),
-					AddEmpty: true,
+					Filename:   filepath.Join(subdir, randomFile.Name()),
+					SampleName: pad.SampleName,
+					AddEmpty:   true,
 				})
 			}
 		}
@@ -97,8 +104,8 @@ func getInfosForPad(ctx context.Context, basePath string, pads []string, pad str
 	return infos, nil
 }
 
-func findNotSeenPad(basePath string, pads []string, seen map[string]struct{}) (string, error) {
-	result := ""
+func findNotSeenPad(basePath string, pads []string, seen map[string]struct{}) (*pad, error) {
+	var result *pad
 
 	entries, err := os.ReadDir(basePath)
 	if err != nil {
@@ -116,19 +123,22 @@ func findNotSeenPad(basePath string, pads []string, seen map[string]struct{}) (s
 			subdir := filepath.Join(basePath, entry.Name())
 			files, err := os.ReadDir(subdir)
 			if err != nil {
-				return "", fmt.Errorf("read directory %s: %w", subdir, err)
+				return nil, fmt.Errorf("read directory %s: %w", subdir, err)
 			}
 
 			for _, f := range files {
 				if !f.IsDir() && strings.HasSuffix(strings.ToLower(f.Name()), wav.WavExt) {
 					padName, err := getPadName(f.Name())
 					if err != nil {
-						return "", fmt.Errorf("get pad name from %s: %w", f.Name(), err)
+						return nil, fmt.Errorf("get pad name from %s: %w", f.Name(), err)
 					}
 
 					_, ok := seen[padName]
 					if !ok {
-						result = padName
+						result = &pad{
+							SampleName: strings.TrimSuffix(f.Name(), filepath.Ext(f.Name())),
+							PadName:    padName,
+						}
 
 						break
 					}

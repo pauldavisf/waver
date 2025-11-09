@@ -7,14 +7,20 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 )
 
 type CombInfo struct {
-	Filename string
-	AddEmpty bool
+	Filename   string
+	SampleName string
+	AddEmpty   bool
 }
 
-func CombineWavFiles(ctx context.Context, combInfos []CombInfo, outFileName string) error {
+func CombineWavFiles(ctx context.Context, combInfos []CombInfo, outPath string) error {
+	if len(combInfos) == 0 {
+		return nil
+	}
+
 	var combinedData []byte
 	var firstHeader *wav.WavHeader
 
@@ -56,6 +62,8 @@ func CombineWavFiles(ctx context.Context, combInfos []CombInfo, outFileName stri
 
 	firstHeader.Subchunk2Size = uint32(len(combinedData))
 	firstHeader.ChunkSize = 36 + firstHeader.Subchunk2Size
+
+	outFileName := filepath.Join(outPath, combInfos[0].SampleName+wav.WavExt)
 
 	out, err := os.Create(outFileName)
 	if err != nil {
