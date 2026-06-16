@@ -39,13 +39,14 @@ func combine(base string) error {
 	}
 
 	if !exists {
-		return fmt.Errorf("dir %s not exists", base)
+		return fmt.Errorf("dir %s does not exist or is not a directory", base)
 	}
 
 	cleanPath := filepath.Clean(base)
 	lastDir := filepath.Base(cleanPath)
+	outPath := filepath.Join("out", lastDir)
 
-	err = ensureDir("out/" + lastDir)
+	err = ensureDir(outPath)
 	if err != nil {
 		return err
 	}
@@ -56,7 +57,7 @@ func combine(base string) error {
 	}
 
 	for _, infos := range files {
-		err := comb.CombineWavFiles(context.Background(), infos, "out/"+lastDir+"/")
+		err := comb.CombineWavFiles(context.Background(), infos, outPath)
 		if err != nil {
 			return fmt.Errorf("combine wav files: %w", err)
 		}
@@ -66,12 +67,16 @@ func combine(base string) error {
 }
 
 func isDirExists(path string) (bool, error) {
-	_, err := os.Stat(path)
+	info, err := os.Stat(path)
 	if os.IsNotExist(err) {
 		return false, nil
 	}
 
-	return true, err
+	if err != nil {
+		return false, err
+	}
+
+	return info.IsDir(), nil
 }
 
 func ensureDir(path string) error {
