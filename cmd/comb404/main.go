@@ -2,11 +2,11 @@ package main
 
 import (
 	"context"
-	"elon/waver/internal/comb"
-	"elon/waver/internal/finder"
+	"elon/waver/internal/app"
+	"elon/waver/internal/ui"
 	"fmt"
 	"os"
-	"path/filepath"
+	"os/signal"
 	"strings"
 )
 
@@ -16,12 +16,36 @@ func main() {
 		panic("no commands in arguments")
 	}
 
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+
 	if strings.ToLower(args[1]) == "comb" {
 		if len(args) <= 2 {
 			panic("no pattern path in args")
 		}
 
-		err := combine(args[2])
+		_, err := app.Combine(ctx, args[2], "out")
+		if err != nil {
+			panic(err)
+		}
+
+		return
+	}
+
+	if strings.ToLower(args[1]) == "ui" {
+		addr := "127.0.0.1:4040"
+		open := true
+
+		for _, arg := range args[2:] {
+			if arg == "--no-open" {
+				open = false
+				continue
+			}
+
+			addr = arg
+		}
+
+		err := ui.Run(ctx, addr, open)
 		if err != nil {
 			panic(err)
 		}
@@ -30,67 +54,4 @@ func main() {
 	}
 
 	panic(fmt.Sprintf("unknown command: %s", args[1]))
-}
-
-func combine(base string) error {
-	exists, err := isDirExists(base)
-	if err != nil {
-		return fmt.Errorf("check dir exists: %w", err)
-	}
-
-	if !exists {
-		return fmt.Errorf("dir %s does not exist or is not a directory", base)
-	}
-
-	cleanPath := filepath.Clean(base)
-	lastDir := filepath.Base(cleanPath)
-	outPath := filepath.Join("out", lastDir)
-
-	err = ensureDir(outPath)
-	if err != nil {
-		return err
-	}
-
-	files, err := finder.FindFilesForPads(context.Background(), base, []string{})
-	if err != nil {
-		return fmt.Errorf("find files for pads: %w", err)
-	}
-
-	for _, infos := range files {
-		err := comb.CombineWavFiles(context.Background(), infos, outPath)
-		if err != nil {
-			return fmt.Errorf("combine wav files: %w", err)
-		}
-	}
-
-	return nil
-}
-
-func isDirExists(path string) (bool, error) {
-	info, err := os.Stat(path)
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-
-	if err != nil {
-		return false, err
-	}
-
-	return info.IsDir(), nil
-}
-
-func ensureDir(path string) error {
-	info, err := os.Stat(path)
-	if os.IsNotExist(err) {
-		err := os.MkdirAll(path, 0755)
-		if err != nil {
-			return fmt.Errorf("make dir: %w", err)
-		}
-	} else if err != nil {
-		return fmt.Errorf("check dir: %w", err)
-	} else if !info.IsDir() {
-		return fmt.Errorf("is not a directory: %s", path)
-	}
-
-	return nil
 }

@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Waver</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <script defer src="/static/app.js"></script>
+  </head>
+  <body>
+    <main class="shell">
+      <section class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Склейка паттернов SP-404mk2</p>
+            <h1>Waver</h1>
+          </div>
+          <span class="mode-pill">Локально</span>
+        </header>
+
+        <form class="tool-panel" id="combine-form">
+          <div class="field-group">
+            <label for="project-path">Папка проекта</label>
+            <div class="path-row">
+              <input id="project-path" name="path" type="text" autocomplete="off" spellcheck="false" placeholder="/Volumes/FLASH/PROJECT_08">
+              <button id="select-project" type="button" class="secondary-button">Выбрать</button>
+            </div>
+          </div>
+
+          <div class="field-group">
+            <label for="output-root">Папка результата</label>
+            <div class="path-row">
+              <input id="output-root" name="outputRoot" type="text" autocomplete="off" spellcheck="false" placeholder="out">
+              <button id="select-output" type="button" class="secondary-button">Выбрать</button>
+            </div>
+          </div>
+
+          <div class="recent-paths" id="recent-paths" hidden></div>
+
+          <div class="actions">
+            <button id="run-button" class="primary-button" type="submit">Склеить</button>
+          </div>
+        </form>
+
+        <section class="status-grid" aria-live="polite">
+          <div class="metric">
+            <span>Дорожки</span>
+            <strong id="metric-tracks">0</strong>
+          </div>
+          <div class="metric">
+            <span>Аудио</span>
+            <strong id="metric-sources">0</strong>
+          </div>
+          <div class="metric">
+            <span>Тишина</span>
+            <strong id="metric-silence">0</strong>
+          </div>
+          <div class="metric">
+            <span>Сегменты</span>
+            <strong id="metric-segments">0</strong>
+          </div>
+        </section>
+
+        <section class="result-panel" id="result-panel" aria-live="polite">
+          <span class="status-dot" id="status-dot"></span>
+          <div>
+            <h2 id="status-title">Готов</h2>
+            <p id="status-message">Ожидаю папку проекта.</p>
+          </div>
+        </section>
+
+        <section class="output-panel" id="output-panel" hidden>
+          <span>Результат</span>
+          <code id="output-path"></code>
+        </section>
+      </section>
+    </main>
+  </body>
+</html>
