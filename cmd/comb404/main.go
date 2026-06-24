@@ -12,12 +12,18 @@ import (
 
 func main() {
 	args := os.Args
-	if len(args) <= 1 {
-		panic("no commands in arguments")
-	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
+
+	if len(args) <= 1 {
+		err := ui.Run(ctx, "127.0.0.1:4040", true)
+		if err != nil {
+			panic(err)
+		}
+
+		return
+	}
 
 	if strings.ToLower(args[1]) == "comb" {
 		if len(args) <= 2 {
