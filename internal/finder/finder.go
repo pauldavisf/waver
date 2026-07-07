@@ -33,7 +33,7 @@ func FindFilesForPads(ctx context.Context, basePath string, pads []string) (map[
 
 		infos, err := getInfosForPad(ctx, basePath, pads, *pad)
 		if err != nil {
-			return nil, fmt.Errorf("get files for pad %s: %w", pad, err)
+			return nil, fmt.Errorf("get files for pad %v: %w", pad, err)
 		}
 
 		result[pad.PadName] = infos
@@ -46,7 +46,7 @@ func FindFilesForPads(ctx context.Context, basePath string, pads []string) (map[
 func getInfosForPad(ctx context.Context, basePath string, pads []string, pad pad) ([]comb.CombInfo, error) {
 	entries, err := os.ReadDir(basePath)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	sort.Slice(entries, func(i, j int) bool {
@@ -69,15 +69,29 @@ func getInfosForPad(ctx context.Context, basePath string, pads []string, pad pad
 				return nil, fmt.Errorf("read directory %s: %w", subdir, err)
 			}
 
-			var randomFile os.DirEntry
+			var silenceFile string
+			var silenceSize uint32
 			added := false
 
 			for _, f := range files {
 				if !f.IsDir() && strings.HasSuffix(strings.ToLower(f.Name()), wav.WavExt) {
-					randomFile = f
+					fullPath := filepath.Join(subdir, f.Name())
+					dataSize, err := getWavDataSize(fullPath)
+					if err != nil {
+						return nil, err
+					}
 
-					if strings.HasPrefix(f.Name(), pad.PadName) {
-						fullPath := filepath.Join(subdir, f.Name())
+					if silenceFile == "" || dataSize > silenceSize {
+						silenceFile = fullPath
+						silenceSize = dataSize
+					}
+
+					padName, err := getPadName(f.Name())
+					if err != nil {
+						return nil, fmt.Errorf("get pad name from %s: %w", f.Name(), err)
+					}
+
+					if padName == pad.PadName {
 						infos = append(infos, comb.CombInfo{
 							Filename:   fullPath,
 							SampleName: pad.SampleName,
@@ -92,8 +106,12 @@ func getInfosForPad(ctx context.Context, basePath string, pads []string, pad pad
 			}
 
 			if !added {
+				if silenceFile == "" {
+					return nil, fmt.Errorf("no WAV files in pattern directory %s", subdir)
+				}
+
 				infos = append(infos, comb.CombInfo{
-					Filename:   filepath.Join(subdir, randomFile.Name()),
+					Filename:   silenceFile,
 					SampleName: pad.SampleName,
 					AddEmpty:   true,
 				})
@@ -105,11 +123,9 @@ func getInfosForPad(ctx context.Context, basePath string, pads []string, pad pad
 }
 
 func findNotSeenPad(basePath string, pads []string, seen map[string]struct{}) (*pad, error) {
-	var result *pad
-
 	entries, err := os.ReadDir(basePath)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	for _, entry := range entries {
@@ -135,26 +151,40 @@ func findNotSeenPad(basePath string, pads []string, seen map[string]struct{}) (*
 
 					_, ok := seen[padName]
 					if !ok {
-						result = &pad{
+						return &pad{
 							SampleName: strings.TrimSuffix(f.Name(), filepath.Ext(f.Name())),
 							PadName:    padName,
-						}
-
-						break
+						}, nil
 					}
 				}
 			}
 		}
 	}
 
-	return result, nil
+	return nil, nil
 }
 
 func getPadName(source string) (string, error) {
-	parts := strings.SplitN(source, "-", 3)
+	name := strings.TrimSuffix(source, filepath.Ext(source))
+	parts := strings.SplitN(name, "-", 3)
 	if len(parts) < 2 {
 		return "", fmt.Errorf("invalid pad name format: %s", source)
 	}
 
 	return parts[0] + "-" + parts[1], nil
+}
+
+func getWavDataSize(filename string) (uint32, error) {
+	f, err := os.Open(filename)
+	if err != nil {
+		return 0, fmt.Errorf("open WAV file %s: %w", filename, err)
+	}
+	defer f.Close()
+
+	header, err := wav.ReadWavHeader(f)
+	if err != nil {
+		return 0, fmt.Errorf("read WAV header from %s: %w", filename, err)
+	}
+
+	return header.Subchunk2Size, nil
 }
